@@ -23,9 +23,7 @@ Proyek ini adalah sebuah backend service yang menyediakan API untuk operasi CRUD
 - [Konfigurasi](#konfigurasi)
 - [Penggunaan](#penggunaan)
 - [Fitur](#fitur)
-- [Endpoint API](#endpoint-api)
-- [Berkontribusi](#berkontribusi)
-- [Lisensi](#lisensi)
+- [Lisensi](#license)
 
 ## Instalasi
 
@@ -54,12 +52,16 @@ Proyek ini adalah sebuah backend service yang menyediakan API untuk operasi CRUD
 
 ## Konfigurasi
 
-1.  Pastikan server MySQL Anda berjalan.
-2.  Buat sebuah database baru. Berdasarkan kode `main.go`, nama databasenya adalah `djawa`.
+1.  Pastikan server MySQL Anda sudah berjalan.
+2.  Buat sebuah database baru. Nama database default adalah `djawa`.
     ```sql
     CREATE DATABASE djawa;
     ```
-3.  Koneksi database saat ini di-*hardcode* di dalam `main.go`. Sangat disarankan untuk memindahkannya ke *environment variables* untuk keamanan dan fleksibilitas.
+3.  Proyek ini menggunakan *environment variables* untuk konfigurasi. Buat file bernama `.env` di root direktori proyek dan isi dengan konfigurasi koneksi database Anda.
+    ```bash
+    # Isi file .env
+    DB_DSN="root:@tcp(127.0.0.1:3306)/djawa?charset=utf8mb4&parseTime=True&loc=Local"
+    ```
 
 ## Penggunaan
 
@@ -68,7 +70,7 @@ Untuk menjalankan server pengembangan, gunakan perintah berikut dari root direkt
 go run main.go
 ```
 
-## Features
+## Fitur
 
 - ✨ **Book:** Pencatatan daftar buku
 - ✅ **User:** Login user dengan jwt bearer

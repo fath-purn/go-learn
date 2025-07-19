@@ -3,13 +3,32 @@ package auth
 import (
 	"errors"
 	"fmt"
+	"log"
+	"os"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/joho/godotenv"
 )
 
-// Pastikan secret key diambil dari environment variable di produksi!
-var jwtSecret = []byte("your_super_secret_jwt_key_here_for_prod") // Ganti dengan secret key yang kuat!
+// jwtSecret adalah kunci rahasia untuk menandatangani token.
+// Variabel ini diinisialisasi di dalam fungsi init().
+var jwtSecret []byte
+
+// init dieksekusi secara otomatis saat paket 'auth' diimpor.
+// Fungsi ini bertanggung jawab untuk memuat konfigurasi yang diperlukan.
+func init() {
+	// Memuat variabel dari file .env, berguna untuk pengembangan lokal.
+	if err := godotenv.Load(); err != nil {
+		log.Println("Peringatan: file .env tidak ditemukan, akan membaca environment variables dari sistem.")
+	}
+
+	secret := os.Getenv("JWT_SECRET")
+	if secret == "" {
+		log.Fatal("FATAL: Environment variable JWT_SECRET tidak di-set.")
+	}
+	jwtSecret = []byte(secret)
+}
 
 // MyClaims mendefinisikan struktur klaim kustom untuk JWT kita.
 type MyClaims struct {
@@ -42,27 +61,26 @@ func GenerateToken(userID string) (string, error) {
 	return tokenString, nil
 }
 
+// ValidateToken memverifikasi tanda tangan token dan mengurai klaim.
 func ValidateToken(tokenString string) (*MyClaims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &MyClaims{}, func(token *jwt.Token) (interface{}, error) {
+		// Pastikan algoritma penandatanganan adalah yang kita harapkan (HMAC).
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
 		return jwtSecret, nil
 	})
 
+	// Library jwt sudah memberikan error yang deskriptif (misalnya, ErrTokenExpired).
+	// Kita bisa langsung mengembalikannya untuk memberikan konteks yang lebih baik.
 	if err != nil {
-		if errors.Is(err, jwt.ErrTokenExpired) {
-			return nil, fmt.Errorf("token is expired")
-		}
-		if errors.Is(err, jwt.ErrTokenSignatureInvalid) {
-			return nil, fmt.Errorf("invalid token signature")
-		}
-		return nil, fmt.Errorf("failed to parse or validate token: %w", err)
+		return nil, fmt.Errorf("validasi token gagal: %w", err)
 	}
 
-	if claims, ok := token.Claims.(*MyClaims); ok && token.Valid {
+	claims, ok := token.Claims.(*MyClaims)
+	if ok && token.Valid {
 		return claims, nil
-	} else {
-		return nil, fmt.Errorf("invalid token claims")
 	}
+
+	return nil, errors.New("token tidak valid")
 }

@@ -1,9 +1,9 @@
 # Judul Proyek Anda (e.g., Djawa API Service)
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/your-username/your-repo)](https://goreportcard.com/report/github.com/your-username/your-repo)
+[![Go Report Card](https://goreportcard.com/badge/github.com/fath-purn/go-learn)](https://goreportcard.com/report/github.com/fath-purn/go-learn)
 [![Go Version](https://img.shields.io/badge/go%20version-%3E=1.18-blue.svg)](https://golang.org/dl/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Build Status](https://github.com/your-username/your-repo/actions/workflows/go.yml/badge.svg)](https://github.com/your-username/your-repo/actions)
+[![Build Status](https://github.com/fath-purn/go-learn/actions/workflows/go.yml/badge.svg)](https://github.com/fath-purn/go-learn/actions)
 
 Layanan REST API yang dibangun menggunakan Go, Gin, dan GORM untuk mengelola data buku, pengguna, dan tautan pendek.
 
@@ -38,12 +38,12 @@ Proyek ini adalah sebuah backend service yang menyediakan API untuk operasi CRUD
 
 1.  **Clone repositori ini:**
     ```bash
-    git clone https://github.com/your-username/your-repo.git
+    git clone https://github.com/fath-purn/go-learn
     ```
 
 2.  **Masuk ke direktori proyek:**
     ```bash
-    cd your-repo
+    cd go-learn
     ```
 
 3.  **Install dependensi:**
@@ -68,27 +68,11 @@ Untuk menjalankan server pengembangan, gunakan perintah berikut dari root direkt
 go run main.go
 ```
 
-## Usage
-
-Show how to use your project. Provide code examples and/or screenshots to make it as clear as possible.
-
-```javascript
-// Example of how to use the main function of the project
-const myProject = require('./index');
-
-const result = myProject.someFunction('input');
-console.log(result); // Expected output
-```
-
 ## Features
 
-- ✨ **Feature A:** A brief description of what this feature does.
-- 🚀 **Feature B:** A brief description of what this feature does.
-- ✅ **Feature C:** A brief description of what this feature does.
-
-## Contributing
-
-Contributions are welcome! Please read the [CONTRIBUTING.md](CONTRIBUTING.md) file for details on our code of conduct and the process for submitting pull requests.
+- ✨ **Book:** Pencatatan daftar buku
+- ✅ **User:** Login user dengan jwt bearer
+- 🚀 **Short URL:** Memperpendek URL
 
 ## License
 

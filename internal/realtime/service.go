@@ -2,7 +2,7 @@ package realtime
 
 type Service interface {
 	SaveMessage(input Message) (Message, error)
-	GetMessage() ([]Message, error)
+	GetMessageByRoom(roomID string) ([]Message, error)
 }
 
 type service struct {
@@ -17,10 +17,11 @@ func (s *service) SaveMessage(input Message) (Message, error) {
 	message := Message{}
 	message.Content = input.Content
 	message.SenderID = input.SenderID
+	message.RoomID = input.RoomID
 
 	return s.repository.Save(message)
 }
 
-func (s *service) GetMessage() ([]Message, error) {
-	return s.repository.FindAll()
+func (s *service) GetMessageByRoom(roomID string) ([]Message, error) {
+	return s.repository.FindByRoomID(roomID)
 }

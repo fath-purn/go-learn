@@ -60,7 +60,7 @@ func main() {
 	// Buat dan jalankan Hub real-time dalam goroutine terpisah
 	messageRepository := realtime.NewRepository(db)
 	messageService := realtime.NewService(messageRepository)
-	hub := realtime.NewHub(messageService)
+	hub := realtime.NewHub(messageService, userService)
 	go hub.Run()
 	webSocketHandler := handler.NewWebSocketHandler(hub)
 

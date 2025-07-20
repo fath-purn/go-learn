@@ -3,8 +3,10 @@ package handler
 import (
 	"encoding/json"
 	"example/hello/internal/realtime"
+	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -46,6 +48,18 @@ func (h *WebSocketHandler) ServeWs(c *gin.Context) {
 		return
 	}
 
+	roomID := c.DefaultQuery("room", "general")
+
+	// validasi untuk private room
+	if strings.HasPrefix(roomID, "private-") {
+		// memastikan user terontetikasi
+		isValidParticipant, err := isUserParticipantOfPrivateRoom(userID, roomID)
+		if err != nil || !isValidParticipant {
+			log.Printf("Akses ditolak: User %s tidak valid untuk room private %s", userID, roomID)
+			return
+		}
+	}
+
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		log.Println("Gagal upgrade ke websocket:", err)
@@ -53,11 +67,27 @@ func (h *WebSocketHandler) ServeWs(c *gin.Context) {
 	}
 
 	// Gunakan UserID yang didapat dari token JWT di middleware.
-	client := &realtime.Client{UserID: userID, Hub: h.hub, Conn: conn, Send: make(chan realtime.ChatMessage, 256)}
+	client := &realtime.Client{UserID: userID, RoomID: roomID, Hub: h.hub, Conn: conn, Send: make(chan realtime.ChatMessage, 256)}
 	h.hub.Register <- client
 
 	go h.writePump(client)
 	go h.readPump(client)
+}
+
+func isUserParticipantOfPrivateRoom(currentUserID, roomID string) (bool, error) {
+	parts := strings.Split(roomID, "-")
+	if len(parts) != 3 {
+		return false, fmt.Errorf("format private roomID tidak valid")
+	}
+
+	user1ID := parts[1]
+	user2ID := parts[2]
+
+	if currentUserID == user1ID || currentUserID == user2ID {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 func (h *WebSocketHandler) readPump(c *realtime.Client) {
@@ -93,6 +123,7 @@ func (h *WebSocketHandler) readPump(c *realtime.Client) {
 		fullMessage := realtime.ChatMessage{
 			Type:      "chat_message",
 			Content:   msg.Content,
+			RoomID:    c.RoomID,
 			SenderID:  c.UserID,
 			Timestamp: time.Now(),
 		}

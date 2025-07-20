@@ -2,6 +2,7 @@ package realtime
 
 import (
 	"encoding/json"
+	"example/hello/internal/user"
 	"log"
 	"strconv"
 	"time"
@@ -11,6 +12,9 @@ import (
 type Client struct {
 	// UserID adalah ID dari pengguna yang terotentikasi.
 	UserID string
+
+	// RoomID adalah ID dari room tempat client ini bergabung.
+	RoomID string
 
 	// Hub tempat client ini terdaftar.
 	Hub *Hub
@@ -31,6 +35,10 @@ type ChatMessage struct {
 	Content string `json:"content"`
 	// SenderID adalah ID pengguna yang mengirim pesan.
 	SenderID string `json:"sender_id"`
+	// name
+	SenderName string `json:"sender_name"`
+	// RoomID adalah ID dari room tujuan pesan ini.
+	RoomID string `json:"room_id"`
 	// Timestamp kapan pesan dibuat di server.
 	Timestamp time.Time `json:"timestamp"`
 }
@@ -44,8 +52,8 @@ type Conn interface {
 
 // Hub mengelola semua client dan melakukan broadcast pesan.
 type Hub struct {
-	// Kumpulan client yang terdaftar.
-	clients map[*Client]bool
+	// Kumpulan room yang aktif. Kunci adalah RoomID, nilai adalah peta client di room itu.
+	rooms map[string]map[*Client]bool
 
 	// Pesan masuk dari client.
 	Broadcast chan ChatMessage
@@ -58,16 +66,20 @@ type Hub struct {
 
 	// Service untuk menyimpan pesan ke database.
 	messageService Service
+
+	// untuk data user
+	userService user.Service
 }
 
 // NewHub membuat instance Hub baru.
-func NewHub(messageService Service) *Hub {
+func NewHub(messageService Service, userService user.Service) *Hub {
 	return &Hub{
 		Broadcast:      make(chan ChatMessage),
 		Register:       make(chan *Client),
 		Unregister:     make(chan *Client),
-		clients:        make(map[*Client]bool),
+		rooms:          make(map[string]map[*Client]bool),
 		messageService: messageService,
+		userService:    userService,
 	}
 }
 
@@ -77,16 +89,31 @@ func (h *Hub) Run() {
 	for {
 		select {
 		case client := <-h.Register:
-			h.clients[client] = true
+			// buat room
+			if _, ok := h.rooms[client.RoomID]; !ok {
+				h.rooms[client.RoomID] = make(map[*Client]bool)
+			}
+
+			// mendaftarkan client
+			h.rooms[client.RoomID][client] = true
+
 			// Jalankan goroutine untuk mengirim riwayat chat ke client yang baru terhubung.
 			go h.sendChatHistory(client)
-			log.Println("Client baru terhubung. Total:", len(h.clients))
+			log.Printf("Client %s terhubung ke room %s", client.UserID, client.RoomID)
 
 		case client := <-h.Unregister:
-			if _, ok := h.clients[client]; ok {
-				delete(h.clients, client)
-				close(client.Send)
-				log.Println("Client terputus. Sisa:", len(h.clients))
+			// hapus client dari room
+			if room, ok := h.rooms[client.RoomID]; ok {
+				if _, ok := room[client]; ok {
+					delete(room, client)
+					close(client.Send)
+					log.Printf("Client %s terputus dari room %s. Sisa: %d", client.UserID, client.RoomID, len(room))
+				}
+				// jika room kosong, maka hapus room
+				if len(room) == 0 {
+					delete(h.rooms, client.RoomID)
+					log.Printf("Room %s kosong. Dihapus.", client.RoomID)
+				}
 			}
 
 		case chatMessage := <-h.Broadcast:
@@ -99,6 +126,7 @@ func (h *Hub) Run() {
 
 			dbMessage := Message{
 				Content:  chatMessage.Content,
+				RoomID:   chatMessage.RoomID,
 				SenderID: uint(senderID),
 			}
 			_, err = h.messageService.SaveMessage(dbMessage)
@@ -107,19 +135,27 @@ func (h *Hub) Run() {
 				// Kita tetap melanjutkan broadcast meskipun gagal menyimpan
 			}
 
-			// Marshal pesan ke JSON untuk logging
-			if msgJson, err := json.Marshal(chatMessage); err == nil {
-				log.Printf("Broadcasting pesan: %s", msgJson)
+			// ambil nama user
+			sender, err := h.userService.FindByID(int(senderID))
+			if err == nil {
+				chatMessage.SenderName = sender.Name
 			}
 
-			for client := range h.clients {
-				select {
-				case client.Send <- chatMessage:
-				default:
-					// Jika channel send penuh, client dianggap lambat.
-					// Kita tutup koneksinya dan hapus dari hub.
-					close(client.Send)
-					delete(h.clients, client)
+			// Marshal pesan ke JSON untuk logging
+			if msgJson, err := json.Marshal(chatMessage); err == nil {
+				log.Printf("Broadcasting pesan ke room %s: %s", chatMessage.RoomID, msgJson)
+			}
+
+			// kirim pesan ke room sesuai
+			if room, ok := h.rooms[chatMessage.RoomID]; ok {
+				for client := range room {
+					select {
+					case client.Send <- chatMessage:
+					default:
+						// jika channel penuh maka hapus koneksi
+						close(client.Send)
+						delete(room, client)
+					}
 				}
 			}
 		}
@@ -128,20 +164,28 @@ func (h *Hub) Run() {
 
 // sendChatHistory mengambil riwayat chat dari database dan mengirimkannya ke satu client.
 func (h *Hub) sendChatHistory(client *Client) {
-	history, err := h.messageService.GetMessage()
+	history, err := h.messageService.GetMessageByRoom(client.RoomID)
 	if err != nil {
-		log.Printf("Gagal mengambil riwayat chat: %v", err)
+		log.Printf("Gagal mengambil riwayat chat untuk room %s: %v", client.RoomID, err)
 		return
 	}
 
-	log.Printf("Mengirim %d pesan riwayat ke client %s", len(history), client.UserID)
+	log.Printf("Mengirim %d pesan riwayat dari room %s ke client %s", len(history), client.RoomID, client.UserID)
 
 	for _, msg := range history {
+		senderName := ""
+		sender, err := h.userService.FindByID(int(msg.SenderID))
+		if err == nil {
+			senderName = sender.Name
+		}
+
 		chatMessage := ChatMessage{
-			Type:      "history_message", // Tipe pesan khusus untuk riwayat
-			Content:   msg.Content,
-			SenderID:  strconv.FormatUint(uint64(msg.SenderID), 10),
-			Timestamp: msg.CreatedAt,
+			Type:       "history_message", // Tipe pesan khusus untuk riwayat
+			Content:    msg.Content,
+			RoomID:     msg.RoomID,
+			SenderID:   strconv.FormatUint(uint64(msg.SenderID), 10),
+			SenderName: senderName,
+			Timestamp:  msg.CreatedAt,
 		}
 
 		// Kirim pesan ke channel Send milik client.

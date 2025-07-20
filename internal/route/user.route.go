@@ -1,19 +1,13 @@
 package route
 
 import (
-	"example/hello/handler"
-	"example/hello/middleware"
-	"example/hello/user"
+	"example/hello/internal/handler"
+	"example/hello/internal/middleware"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
-func UserRoutes(r *gin.Engine, db *gorm.DB) {
-	userRepository := user.NewRepository(db)
-	userService := user.NewService(userRepository)
-	userHandler := handler.NewUserHandler(userService)
-
+func UserRoutes(r *gin.Engine, userHandler *handler.UserHandler) {
 	// Create a new group for user routes
 	userGroup := r.Group("/v1")
 

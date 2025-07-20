@@ -1,17 +1,12 @@
 package route
 
 import (
-	"example/hello/handler"
-	"example/hello/short"
+	"example/hello/internal/handler"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
-func ShortRoutes(r *gin.Engine, db *gorm.DB) {
-	shortRepository := short.NewRepository(db)
-	shortService := short.NewService(shortRepository)
-	shortHandler := handler.NewShortUrlHandler(shortService)
+func ShortRoutes(r *gin.Engine, shortHandler *handler.ShortUrlHandler) {
 
 	shortGroup := r.Group("/v1")
 

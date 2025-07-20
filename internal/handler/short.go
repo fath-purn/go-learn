@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"example/hello/short"
+	"example/hello/internal/short"
 	"strconv"
 
 	"fmt"
@@ -11,15 +11,15 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
-type shortHandler struct {
+type ShortUrlHandler struct {
 	shortService short.Service
 }
 
-func NewShortUrlHandler(shortService short.Service) *shortHandler {
-	return &shortHandler{shortService: shortService}
+func NewShortUrlHandler(shortService short.Service) *ShortUrlHandler {
+	return &ShortUrlHandler{shortService: shortService}
 }
 
-func (h *shortHandler) GetShortUrl(c *gin.Context) {
+func (h *ShortUrlHandler) GetShortUrl(c *gin.Context) {
 	url := c.Param("url")
 	if url == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -42,7 +42,7 @@ func (h *shortHandler) GetShortUrl(c *gin.Context) {
 	c.Redirect(http.StatusFound, short.Original)
 }
 
-func (h *shortHandler) CreateShortUrl(c *gin.Context) {
+func (h *ShortUrlHandler) CreateShortUrl(c *gin.Context) {
 	var shortRequest short.ShortRequest
 
 	if err := c.ShouldBindJSON(&shortRequest); err != nil {
@@ -89,7 +89,7 @@ func (h *shortHandler) CreateShortUrl(c *gin.Context) {
 	})
 }
 
-func (h *shortHandler) GetAllShortUrls(c *gin.Context) {
+func (h *ShortUrlHandler) GetAllShortUrls(c *gin.Context) {
 	shorts, err := h.shortService.GetAll()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -107,7 +107,7 @@ func (h *shortHandler) GetAllShortUrls(c *gin.Context) {
 	})
 }
 
-func (h *shortHandler) GetShortUrlByID(c *gin.Context) {
+func (h *ShortUrlHandler) GetShortUrlByID(c *gin.Context) {
 	id := c.Param("id")
 	if id == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -144,7 +144,7 @@ func (h *shortHandler) GetShortUrlByID(c *gin.Context) {
 	})
 }
 
-func (h *shortHandler) UpdateShortUrl(c *gin.Context) {
+func (h *ShortUrlHandler) UpdateShortUrl(c *gin.Context) {
 	ID := c.Param("id")
 	if ID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -190,7 +190,7 @@ func (h *shortHandler) UpdateShortUrl(c *gin.Context) {
 	})
 }
 
-func (h *shortHandler) DeleteShortUrl(c *gin.Context) {
+func (h *ShortUrlHandler) DeleteShortUrl(c *gin.Context) {
 	id := c.Param("id")
 	if id == "" {
 		c.JSON(http.StatusBadRequest, gin.H{

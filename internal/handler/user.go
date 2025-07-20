@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"example/hello/user"
+	"example/hello/internal/user"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -10,14 +10,14 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
-type userHandler struct {
+type UserHandler struct {
 	userService user.Service
 }
 
-func NewUserHandler(userService user.Service) *userHandler {
-	return &userHandler{userService: userService}
+func NewUserHandler(userService user.Service) *UserHandler {
+	return &UserHandler{userService: userService}
 }
-func (h *userHandler) GetUsers(c *gin.Context) {
+func (h *UserHandler) GetUsers(c *gin.Context) {
 	users, err := h.userService.FindAll()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"status": false, "message": "Failed to retrieve users"})
@@ -25,7 +25,7 @@ func (h *userHandler) GetUsers(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"status": true, "data": convertToUserResponses(users)})
 }
-func (h *userHandler) GetUserById(c *gin.Context) {
+func (h *UserHandler) GetUserById(c *gin.Context) {
 	intID, err := h.validateID(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"status": false, "message": err.Error()})
@@ -38,7 +38,7 @@ func (h *userHandler) GetUserById(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"status": true, "data": convertToUserResponse(user)})
 }
-func (h *userHandler) RegisterUser(c *gin.Context) {
+func (h *UserHandler) RegisterUser(c *gin.Context) {
 	var userRequest user.UserRequest
 	if err := c.ShouldBindJSON(&userRequest); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"status": false, "message": h.getValidationErrors(err)})
@@ -51,7 +51,7 @@ func (h *userHandler) RegisterUser(c *gin.Context) {
 	}
 	c.JSON(http.StatusCreated, gin.H{"status": true, "data": convertToUserResponse(newUser)})
 }
-func (h *userHandler) LoginUser(c *gin.Context) {
+func (h *UserHandler) LoginUser(c *gin.Context) {
 	var userRequest user.UserLogin
 	if err := c.ShouldBindJSON(&userRequest); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"status": false, "message": "Invalid input data"})
@@ -64,7 +64,7 @@ func (h *userHandler) LoginUser(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"status": true, "token": token})
 }
-func (h *userHandler) UpdateUser(c *gin.Context) {
+func (h *UserHandler) UpdateUser(c *gin.Context) {
 	intID, err := h.validateID(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"status": false, "message": err.Error()})
@@ -82,7 +82,7 @@ func (h *userHandler) UpdateUser(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"status": true, "data": convertToUserResponse(updatedUser)})
 }
-func (h *userHandler) DeleteUser(c *gin.Context) {
+func (h *UserHandler) DeleteUser(c *gin.Context) {
 	intID, err := h.validateID(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"status": false, "message": err.Error()})
@@ -94,7 +94,7 @@ func (h *userHandler) DeleteUser(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"status": true, "message": "User deleted successfully"})
 }
-func (h *userHandler) validateID(c *gin.Context) (int, error) {
+func (h *UserHandler) validateID(c *gin.Context) (int, error) {
 	ID := c.Param("id")
 	if ID == "" {
 		return 0, fmt.Errorf("ID is required")
@@ -105,7 +105,7 @@ func (h *userHandler) validateID(c *gin.Context) (int, error) {
 	}
 	return intID, nil
 }
-func (h *userHandler) getValidationErrors(err error) []string {
+func (h *UserHandler) getValidationErrors(err error) []string {
 	var errorMessages []string
 	if validationErrors, ok := err.(validator.ValidationErrors); ok {
 		for _, fieldErr := range validationErrors {

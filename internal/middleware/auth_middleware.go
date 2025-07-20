@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	"example/hello/auth"
+	"example/hello/internal/auth"
 	"fmt"
 	"net/http"
 	"strings"

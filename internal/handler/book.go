@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"example/hello/book"
+	"example/hello/internal/book"
 
 	"fmt"
 	"net/http"
@@ -11,15 +11,15 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
-type bookHandler struct {
+type BookHandler struct {
 	bookService book.Service
 }
 
-func NewBookHandler(bookService book.Service) *bookHandler {
-	return &bookHandler{bookService: bookService}
+func NewBookHandler(bookService book.Service) *BookHandler {
+	return &BookHandler{bookService: bookService}
 }
 
-func (h *bookHandler) GetBooks(c *gin.Context) {
+func (h *BookHandler) GetBooks(c *gin.Context) {
 	books, err := h.bookService.FindAll()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -42,7 +42,7 @@ func (h *bookHandler) GetBooks(c *gin.Context) {
 	})
 }
 
-func (h *bookHandler) GetBookById(c *gin.Context) {
+func (h *BookHandler) GetBookById(c *gin.Context) {
 	ID := c.Param("id")
 	if ID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -81,7 +81,7 @@ func (h *bookHandler) GetBookById(c *gin.Context) {
 	})
 }
 
-func (h *bookHandler) CreateBook(c *gin.Context) {
+func (h *BookHandler) CreateBook(c *gin.Context) {
 	var bookRequest book.BookRequest
 
 	if err := c.ShouldBindJSON(&bookRequest); err != nil {
@@ -131,7 +131,7 @@ func (h *bookHandler) CreateBook(c *gin.Context) {
 	})
 }
 
-func (h *bookHandler) UpdateBook(c *gin.Context) {
+func (h *BookHandler) UpdateBook(c *gin.Context) {
 	ID := c.Param("id")
 	if ID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -177,7 +177,7 @@ func (h *bookHandler) UpdateBook(c *gin.Context) {
 	})
 }
 
-func (h *bookHandler) DeleteBook(c *gin.Context) {
+func (h *BookHandler) DeleteBook(c *gin.Context) {
 	ID := c.Param("id")
 	if ID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{

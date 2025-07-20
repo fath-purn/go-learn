@@ -2,7 +2,7 @@ package handler
 
 import (
 	"encoding/json"
-	"example/hello/realtime"
+	"example/hello/internal/realtime"
 	"log"
 	"net/http"
 	"time"

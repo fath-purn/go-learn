@@ -1,15 +1,13 @@
 package route
 
 import (
-	"example/hello/handler"
-	"example/hello/middleware"
-	"example/hello/realtime"
+	"example/hello/internal/handler"
+	"example/hello/internal/middleware"
 
 	"github.com/gin-gonic/gin"
 )
 
-func WebSocketRoutes(r *gin.Engine, hub *realtime.Hub) {
-	webSocketHandler := handler.NewWebSocketHandler(hub)
+func WebSocketRoutes(r *gin.Engine, webSocketHandler *handler.WebSocketHandler) {
 	// Rute Terlindungi (membutuhkan Bearer Token JWT)
 	protected := r.Group("/v1/api")
 	protected.Use(middleware.AuthMiddleware())

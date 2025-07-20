@@ -1,7 +1,7 @@
 package user
 
 import (
-	"example/hello/auth"
+	"example/hello/internal/auth"
 	"fmt"
 	"log"
 	"regexp"

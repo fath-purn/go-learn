@@ -13,14 +13,16 @@ func UserRoutes(r *gin.Engine, userHandler *handler.UserHandler) {
 
 	userGroup.POST("/register", userHandler.RegisterUser)
 	userGroup.POST("/login", userHandler.LoginUser)
+	userGroup.GET("/verify-email", userHandler.VerifyEmail)
+	userGroup.POST("/resend-verification", userHandler.ResendVerificationEmail)
 
 	// Rute Terlindungi (membutuhkan Bearer Token JWT)
-	protected := r.Group("/v1/api")
+	protected := r.Group("/v1/user")
 	protected.Use(middleware.AuthMiddleware())
 
-	protected.GET("/user", userHandler.GetUsers)
-	protected.GET("/user/:id", userHandler.GetUserById)
-	protected.PUT("/user/:id", userHandler.UpdateUser)
-	protected.DELETE("/user/:id", userHandler.DeleteUser)
-
+	protected.GET("/", userHandler.GetUsers)
+	protected.GET("/me", userHandler.MyAccount)
+	protected.GET("/:id", userHandler.GetUserById)
+	protected.PUT("/:id", userHandler.UpdateUser)
+	protected.DELETE("/:id", userHandler.DeleteUser)
 }

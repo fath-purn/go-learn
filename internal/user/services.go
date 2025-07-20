@@ -4,9 +4,12 @@ import (
 	"example/hello/internal/auth"
 	"fmt"
 	"log"
+	"net/smtp"
+	"os"
 	"regexp"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/patrickmn/go-cache"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -18,6 +21,9 @@ type Service interface {
 	FindByID(ID int) (User, error)
 	Update(ID int, user UserRequest) (User, error)
 	Delete(ID int) error
+	FindOrCreateByGoogle(input GoogleLoginInput) (User, error)
+	VerifyEmail(token string) error
+	ResendVerificationEmail(email string) error
 }
 
 type service struct {
@@ -41,6 +47,34 @@ func NewService(repository Repository) *service {
 		repository: repository,
 		cache:      c,
 	}
+}
+
+func (s *service) FindOrCreateByGoogle(input GoogleLoginInput) (User, error) {
+	// Check if user with this email already exists.
+	user, err := s.repository.FindByEmail(input.Email)
+	if err != nil {
+		// If user not found, create a new one.
+		// It's better to check for gorm.ErrRecordNotFound specifically.
+		if err.Error() == "record not found" {
+			newUser := User{
+				Name:     input.Name,
+				Email:    input.Email,
+				Verivied: true, // Pengguna dari Google dianggap terverifikasi secara default
+				// Password can be left empty or set to a random string for Google users.
+				// This prevents them from logging in with a password.
+			}
+			createdUser, err := s.repository.RegisterUser(newUser)
+			if err != nil {
+				return User{}, fmt.Errorf("failed to create Google user: %w", err)
+			}
+			s.cache.Delete(allUsersCacheKey)
+			return createdUser, nil
+		}
+		// Handle other potential errors from the repository.
+		return User{}, err
+	}
+	// If user exists, return them.
+	return user, nil
 }
 
 // FindByID implements Service.
@@ -92,11 +126,21 @@ func (s *service) RegisterUser(userRequest UserRequest) (User, error) {
 		Email:    userRequest.Email,
 		Password: string(hashedPassword),
 		Phone:    userRequest.Phone,
+		Verivied: false,
 	}
+
+	// token verifikasi
+	token := uuid.New().String()
+	expiresAt := time.Now().Add(24 * time.Hour)
+	user.VerificationToken = &token
+	user.VerificationTokenExpiresAt = &expiresAt
+
 	createdUser, err := s.repository.RegisterUser(user)
 	if err != nil {
 		return User{}, fmt.Errorf("error registering user: %w", err)
 	}
+
+	go sendVerificationEmail(createdUser)
 
 	s.cache.Delete(allUsersCacheKey)
 
@@ -108,21 +152,25 @@ func (s *service) UserLogin(req UserLogin) (string, User, error) {
 		Email:    req.Email,
 		Password: req.Password,
 	}
+
 	foundUser, err := s.repository.LoginUser(user)
 	if err != nil {
 		log.Println("Error finding user:", err)
 		return "", User{}, fmt.Errorf("invalid email or password")
 	}
+
 	// Verify password
 	if err := bcrypt.CompareHashAndPassword([]byte(foundUser.Password), []byte(user.Password)); err != nil {
 		log.Println("Error verifying password:", err)
 		return "", User{}, fmt.Errorf("invalid email or password")
 	}
-	token, err := auth.GenerateToken(fmt.Sprintf("%d", foundUser.ID))
+
+	token, err := auth.GenerateToken(fmt.Sprintf("%d", foundUser.ID), foundUser.Verivied)
 	if err != nil {
 		log.Println("Service: Error generating token:", err)
 		return "", User{}, fmt.Errorf("failed to generate authentication token")
 	}
+
 	foundUser.Password = "" // Clear password before returning
 	return token, foundUser, nil
 }
@@ -180,6 +228,10 @@ func (s *service) Update(ID int, userRequest UserRequest) (User, error) {
 }
 
 func (s *service) Delete(ID int) error {
+	if _, err := s.repository.FindByID(ID); err != nil {
+		return fmt.Errorf("error finding user for deletion: %w", err)
+	}
+
 	if err := s.repository.Delete(ID); err != nil {
 		return fmt.Errorf("error deleting user: %w", err)
 	}
@@ -194,4 +246,91 @@ func isValidEmail(email string) bool {
 	// Improved email validation regex
 	var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
 	return emailRegex.MatchString(email)
+}
+
+func (s *service) VerifyEmail(token string) error {
+	// cari user berdasarkan token
+	user, err := s.repository.FindByVerificationToken(token)
+	if err != nil {
+		return fmt.Errorf("token verifikasi tidak valid atau tidak bisa digunakan")
+	}
+
+	// Periksa apakah token sudah kadaluarsa
+	if user.VerificationTokenExpiresAt.Before(time.Now()) {
+		return fmt.Errorf("token verifikasi sudah kadaluarsa")
+	}
+
+	// Set verivied menjadi true
+	user.Verivied = true
+	user.VerificationToken = nil
+	user.VerificationTokenExpiresAt = nil
+
+	// Simpan perubahan
+	_, err = s.repository.Update(user)
+	if err != nil {
+		return fmt.Errorf("gagal memperbarui status verifikasi: %w", err)
+	}
+
+	s.cache.Delete(allUsersCacheKey)
+	s.cache.Delete(fmt.Sprintf("%s%d", userByIDCacheKeyPrefix, user.ID))
+
+	return nil
+}
+
+func (s *service) ResendVerificationEmail(email string) error {
+	user, err := s.repository.FindByEmail(email)
+	if err != nil {
+		return fmt.Errorf("user with that email not found")
+	}
+
+	if user.Verivied {
+		return fmt.Errorf("this account is already verified")
+	}
+
+	// Generate a new token and expiration
+	token := uuid.New().String()
+	expiresAt := time.Now().Add(24 * time.Hour)
+	user.VerificationToken = &token
+	user.VerificationTokenExpiresAt = &expiresAt
+
+	// Save the new token to the database
+	_, err = s.repository.Update(user)
+	if err != nil {
+		return fmt.Errorf("failed to update verification token: %w", err)
+	}
+
+	go sendVerificationEmail(user)
+	return nil
+}
+
+// sendVerificationEmail adalah helper untuk mengirim email menggunakan SMTP.
+func sendVerificationEmail(user User) {
+	if user.VerificationToken == nil {
+		log.Printf("Tidak ada token verifikasi untuk pengguna %s, email tidak dikirim.", user.Email)
+		return
+	}
+
+	// Ambil konfigurasi dari environment variables
+	host := os.Getenv("SMTP_HOST")
+	port := os.Getenv("SMTP_PORT")
+	smtpUser := os.Getenv("SMTP_USER")
+	pass := os.Getenv("SMTP_PASS")
+	from := os.Getenv("SMTP_SENDER_EMAIL")
+	appURL := os.Getenv("APP_URL")
+
+	addr := fmt.Sprintf("%s:%s", host, port)
+	auth := smtp.PlainAuth("", smtpUser, pass, host)
+	verificationLink := fmt.Sprintf("%s/v1/verify-email?token=%s", appURL, *user.VerificationToken)
+
+	subject := "Subject: Verifikasi Akun Anda\r\n"
+	mime := "MIME-version: 1.0;\nContent-Type: text/html; charset=\"UTF-8\";\n\n"
+	body := fmt.Sprintf(`<html><body><h2>Selamat Datang!</h2><p>Terima kasih telah mendaftar. Silakan klik link di bawah ini untuk memverifikasi alamat email Anda:</p><p><a href="%s">Verifikasi Email Saya</a></p><p>Link ini akan kedaluwarsa dalam 24 jam.</p></body></html>`, verificationLink)
+	msg := []byte(subject + mime + body)
+
+	err := smtp.SendMail(addr, auth, from, []string{user.Email}, msg)
+	if err != nil {
+		log.Printf("Gagal mengirim email verifikasi ke %s: %v", user.Email, err)
+	} else {
+		log.Printf("Email verifikasi berhasil dikirim ke %s", user.Email)
+	}
 }

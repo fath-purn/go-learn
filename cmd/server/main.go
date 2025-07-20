@@ -13,6 +13,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
@@ -57,6 +59,18 @@ func main() {
 	shortService := short.NewService(shortRepository)
 	shortHandler := handler.NewShortUrlHandler(shortService)
 
+	// Konfigurasi Google OAuth2
+	googleOauthConfig := &oauth2.Config{
+		RedirectURL:  os.Getenv("GOOGLE_REDIRECT_URL"),
+		ClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
+		ClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
+		Scopes:       []string{"https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/userinfo.profile"},
+		Endpoint:     google.Endpoint,
+	}
+
+	// Inisialisasi Auth Handler
+	authHandler := handler.NewAuthHandler(googleOauthConfig, userService)
+
 	// Buat dan jalankan Hub real-time dalam goroutine terpisah
 	messageRepository := realtime.NewRepository(db)
 	messageService := realtime.NewService(messageRepository)
@@ -68,7 +82,7 @@ func main() {
 	r := gin.Default()
 
 	// Setup routes dengan menyuntikkan handler yang sudah dibuat
-	route.SetupRoutes(r, userHandler, bookHandler, shortHandler, webSocketHandler)
+	route.SetupRoutes(r, authHandler, userHandler, bookHandler, shortHandler, webSocketHandler)
 
 	// Start the server on port 8080
 	r.Run(":8080")

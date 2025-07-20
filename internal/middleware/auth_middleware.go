@@ -34,6 +34,7 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		// Simpan informasi user dari klaim di konteks Gin
 		c.Set("userID", claims.UserID)
+		c.Set("verified", claims.Verified)
 
 		c.Next() // Lanjutkan ke handler berikutnya
 	}

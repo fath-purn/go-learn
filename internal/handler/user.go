@@ -3,6 +3,7 @@ package handler
 import (
 	"example/hello/internal/user"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -38,19 +39,83 @@ func (h *UserHandler) GetUserById(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"status": true, "data": convertToUserResponse(user)})
 }
+func (h *UserHandler) MyAccount(c *gin.Context) {
+	// ambil userID
+	userIDVal, exists := c.Get("userID")
+	if !exists {
+		log.Println("Error: userID tidak ditemukan di context Gin")
+		return
+	}
+
+	// Lakukan type assertion dari interface{} ke string.
+	userIDStr, ok := userIDVal.(string)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"status": false, "message": "Invalid user ID format in context"})
+		return
+	}
+
+	// Konversi string ID ke integer.
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"status": false, "message": "Invalid user ID in token"})
+		return
+	}
+
+	user, err := h.userService.FindByID(userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"status": false, "message": "User not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": true, "data": convertToUserResponse(user)})
+}
+
 func (h *UserHandler) RegisterUser(c *gin.Context) {
 	var userRequest user.UserRequest
 	if err := c.ShouldBindJSON(&userRequest); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"status": false, "message": h.getValidationErrors(err)})
 		return
 	}
+
 	newUser, err := h.userService.RegisterUser(userRequest)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"status": false, "message": "Registration failed"})
+		c.JSON(http.StatusInternalServerError, gin.H{"status": false, "message": "Registration failed", "err": err.Error()})
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"status": true, "data": convertToUserResponse(newUser)})
 }
+
+func (h *UserHandler) VerifyEmail(c *gin.Context) {
+	token := c.Query("token")
+	if token == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"status": false, "message": "Token is required"})
+		return
+	}
+
+	err := h.userService.VerifyEmail(token)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"status": false, "message": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": true, "message": "Email verified successfully"})
+}
+
+func (h *UserHandler) ResendVerificationEmail(c *gin.Context) {
+	var input user.ResendVerificationInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"status": false, "message": "Email is required"})
+		return
+	}
+
+	err := h.userService.ResendVerificationEmail(input.Email)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"status": false, "message": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": true, "message": "A new verification email has been sent. Please check your inbox."})
+}
+
 func (h *UserHandler) LoginUser(c *gin.Context) {
 	var userRequest user.UserLogin
 	if err := c.ShouldBindJSON(&userRequest); err != nil {
@@ -64,36 +129,42 @@ func (h *UserHandler) LoginUser(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"status": true, "token": token})
 }
+
 func (h *UserHandler) UpdateUser(c *gin.Context) {
 	intID, err := h.validateID(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"status": false, "message": err.Error()})
 		return
 	}
+
 	var userRequest user.UserRequest
 	if err := c.ShouldBindJSON(&userRequest); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"status": false, "message": "Invalid input data"})
+		c.JSON(http.StatusBadRequest, gin.H{"status": false, "message": "Invalid input data", "err": err.Error()})
 		return
 	}
+
 	updatedUser, err := h.userService.Update(intID, userRequest)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"status": false, "message": "Failed to update user"})
+		c.JSON(http.StatusInternalServerError, gin.H{"status": false, "message": "Failed to update user", "err": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": true, "data": convertToUserResponse(updatedUser)})
 }
+
 func (h *UserHandler) DeleteUser(c *gin.Context) {
 	intID, err := h.validateID(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"status": false, "message": err.Error()})
 		return
 	}
+
 	if err := h.userService.Delete(intID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"status": false, "message": "Failed to delete user"})
+		c.JSON(http.StatusInternalServerError, gin.H{"status": false, "message": "Failed to update user", "err": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": true, "message": "User deleted successfully"})
 }
+
 func (h *UserHandler) validateID(c *gin.Context) (int, error) {
 	ID := c.Param("id")
 	if ID == "" {
@@ -105,6 +176,7 @@ func (h *UserHandler) validateID(c *gin.Context) (int, error) {
 	}
 	return intID, nil
 }
+
 func (h *UserHandler) getValidationErrors(err error) []string {
 	var errorMessages []string
 	if validationErrors, ok := err.(validator.ValidationErrors); ok {
@@ -116,6 +188,7 @@ func (h *UserHandler) getValidationErrors(err error) []string {
 	}
 	return errorMessages
 }
+
 func convertToUserResponse(b user.User) user.UserResponse {
 	return user.UserResponse{
 		ID:    b.ID,
@@ -124,6 +197,7 @@ func convertToUserResponse(b user.User) user.UserResponse {
 		Phone: b.Phone,
 	}
 }
+
 func convertToUserResponses(users []user.User) []user.UserResponse {
 	var userResponses []user.UserResponse
 	for _, b := range users {

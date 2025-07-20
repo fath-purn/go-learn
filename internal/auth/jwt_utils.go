@@ -32,22 +32,24 @@ func init() {
 
 // MyClaims mendefinisikan struktur klaim kustom untuk JWT kita.
 type MyClaims struct {
-	UserID string `json:"user_id"`
+	UserID   string `json:"user_id"`
+	Verified bool   `json:"verified"`
 	jwt.RegisteredClaims
 }
 
 // GenerateToken membuat JWT baru.
 // Ini adalah "sign" token seperti di jsonwebtoken.sign()
-func GenerateToken(userID string) (string, error) {
+func GenerateToken(userID string, verified bool) (string, error) {
 	expirationTime := time.Now().Add(24 * time.Hour) // Token berlaku 24 jam
 
 	claims := &MyClaims{
-		UserID: userID,
+		UserID:   userID,
+		Verified: verified,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			Subject:   userID,
-			Issuer:    "MyApplication", // Aplikasi yang mengeluarkan token
+			Issuer:    "MyApplication",
 		},
 	}
 
@@ -71,7 +73,6 @@ func ValidateToken(tokenString string) (*MyClaims, error) {
 		return jwtSecret, nil
 	})
 
-	// Library jwt sudah memberikan error yang deskriptif (misalnya, ErrTokenExpired).
 	// Kita bisa langsung mengembalikannya untuk memberikan konteks yang lebih baik.
 	if err != nil {
 		return nil, fmt.Errorf("validasi token gagal: %w", err)

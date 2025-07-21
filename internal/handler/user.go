@@ -116,6 +116,44 @@ func (h *UserHandler) ResendVerificationEmail(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": true, "message": "A new verification email has been sent. Please check your inbox."})
 }
 
+func (h *UserHandler) ForgotPassword(c *gin.Context) {
+	var input user.ResendVerificationInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"status": false, "message": h.getValidationErrors(err)})
+		return
+	}
+
+	err := h.userService.ForgotPassword(input.Email)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"status": false, "message": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": true, "message": "A password reset has been sent. Please check your inbox."})
+}
+
+func (h *UserHandler) ResetPassword(c *gin.Context) {
+	var newPassword user.ResetPassword
+	if err := c.ShouldBindJSON(&newPassword); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"status": false, "message": h.getValidationErrors(err)})
+		return
+	}
+
+	token := c.Query("token")
+	if token == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"status": false, "message": "Token is required"})
+		return
+	}
+
+	err := h.userService.ResetPassword(token, newPassword.Password)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"status": false, "message": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": true, "message": "Password reset successfully"})
+}
+
 func (h *UserHandler) LoginUser(c *gin.Context) {
 	var userRequest user.UserLogin
 	if err := c.ShouldBindJSON(&userRequest); err != nil {

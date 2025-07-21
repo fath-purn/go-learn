@@ -34,3 +34,7 @@ type GoogleLoginInput struct {
 type ResendVerificationInput struct {
 	Email string `json:"email" binding:"required,email"`
 }
+
+type ResetPassword struct {
+	Password string `json:"password" binding:"required,min=6"`
+}

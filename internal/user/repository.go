@@ -13,6 +13,7 @@ type Repository interface {
 	Update(user User) (User, error)
 	Delete(ID int) error
 	FindByVerificationToken(token string) (User, error)
+	ResetPassword(user User) (User, error)
 }
 
 type repository struct {
@@ -80,6 +81,14 @@ func (r *repository) FindByVerificationToken(token string) (User, error) {
 	var user User
 	if err := r.db.Where("verification_token = ?", token).First(&user).Error; err != nil {
 		return User{}, err
+	}
+	return user, nil
+}
+
+func (r *repository) ResetPassword(user User) (User, error) {
+	if err := r.db.Save(&user).Error; err != nil {
+		return User{},
+			err
 	}
 	return user, nil
 }

@@ -24,6 +24,8 @@ type Service interface {
 	FindOrCreateByGoogle(input GoogleLoginInput) (User, error)
 	VerifyEmail(token string) error
 	ResendVerificationEmail(email string) error
+	ForgotPassword(email string) error
+	ResetPassword(token string, newPassword string) error
 }
 
 type service struct {
@@ -35,7 +37,6 @@ type service struct {
 const (
 	allUsersCacheKey       = "all_users"
 	userByIDCacheKeyPrefix = "user_by_id_"
-	// ... tambahkan kunci lain sesuai kebutuhan
 )
 
 func NewService(repository Repository) *service {
@@ -303,6 +304,53 @@ func (s *service) ResendVerificationEmail(email string) error {
 	return nil
 }
 
+func (s *service) ForgotPassword(email string) error {
+	user, err := s.repository.FindByEmail(email)
+	if err != nil {
+		// Untuk mencegah serangan enumerasi pengguna, kita bisa memilih untuk tidak mengembalikan error
+		// dan hanya mencatat log. Namun, untuk kejelasan, kita kembalikan error.
+		return fmt.Errorf("pengguna dengan email tersebut tidak ditemukan")
+	}
+
+	// Hasilkan token baru yang berisi email pengguna.
+	// Token ini berumur pendek dan khusus untuk reset password.
+	token, err := auth.GenerateTokenPassword(user.Email)
+	if err != nil {
+		log.Printf("Error saat membuat token reset password untuk %s: %v", email, err)
+		return fmt.Errorf("gagal memulai proses reset password")
+	}
+
+	// Kita tidak perlu menyimpan token ke DB. Token ini bersifat stateless.
+	go sendForgotPasswordEmail(user.Email, token)
+	return nil
+}
+
+func (s *service) ResetPassword(token string, newPassword string) error {
+	claims, err := auth.ValidateTokenPassword(token)
+	if err != nil {
+		return fmt.Errorf("token reset password tidak valid atau kadaluarsa: %w", err)
+	}
+
+	user, err := s.repository.FindByEmail(claims.Email)
+	if err != nil {
+		return fmt.Errorf("pengguna terkait dengan token ini tidak ditemukan")
+	}
+
+	const bcryptCost = 10
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcryptCost)
+	if err != nil {
+		log.Printf("Error saat hashing password baru untuk pengguna %s: %v", user.Email, err)
+		return fmt.Errorf("gagal memproses password baru")
+	}
+
+	user.Password = string(hashedPassword)
+	if _, err := s.repository.ResetPassword(user); err != nil {
+		return fmt.Errorf("gagal memperbarui password: %w", err)
+	}
+
+	return nil
+}
+
 // sendVerificationEmail adalah helper untuk mengirim email menggunakan SMTP.
 func sendVerificationEmail(user User) {
 	if user.VerificationToken == nil {
@@ -332,5 +380,38 @@ func sendVerificationEmail(user User) {
 		log.Printf("Gagal mengirim email verifikasi ke %s: %v", user.Email, err)
 	} else {
 		log.Printf("Email verifikasi berhasil dikirim ke %s", user.Email)
+	}
+}
+
+// sendVerificationEmail adalah helper untuk mengirim email menggunakan SMTP.
+func sendForgotPasswordEmail(email, token string) {
+	// Ambil konfigurasi dari environment variables
+	host := os.Getenv("SMTP_HOST")
+	port := os.Getenv("SMTP_PORT")
+	smtpUser := os.Getenv("SMTP_USER")
+	pass := os.Getenv("SMTP_PASS")
+	from := os.Getenv("SMTP_SENDER_EMAIL")
+	resetAppURL := os.Getenv("FRONTEND_RESET_URL")
+	if resetAppURL == "" {
+		resetAppURL = os.Getenv("APP_URL") + "/v1/reset-password"
+	}
+
+	addr := fmt.Sprintf("%s:%s", host, port)
+	auth := smtp.PlainAuth("", smtpUser, pass, host)
+	resetLink := fmt.Sprintf("%s?token=%s", resetAppURL, token)
+
+	subject := "Subject: Reset Password\r\n"
+	mime := "MIME-version: 1.0;\nContent-Type: text/html; charset=\"UTF-8\";\n\n"
+	body := fmt.Sprintf(`<html><body><h2>Reset Password</h2>
+	<p>Anda meminta untuk mereset password Anda. Klik link di bawah ini untuk melanjutkan:</p>
+	<p><a href="%s">Reset Password</a></p>
+	<p>Jika Anda tidak meminta ini, abaikan email ini. Link ini akan kedaluwarsa dalam 24 jam.</p></body></html>`, resetLink)
+	msg := []byte(subject + mime + body)
+
+	err := smtp.SendMail(addr, auth, from, []string{email}, msg)
+	if err != nil {
+		log.Printf("Passeord %s gagal di perbarui karena: %v", email, err)
+	} else {
+		log.Printf("Password %s berhasil di ganti", email)
 	}
 }

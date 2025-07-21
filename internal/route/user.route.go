@@ -15,6 +15,8 @@ func UserRoutes(r *gin.Engine, userHandler *handler.UserHandler) {
 	userGroup.POST("/login", userHandler.LoginUser)
 	userGroup.GET("/verify-email", userHandler.VerifyEmail)
 	userGroup.POST("/resend-verification", userHandler.ResendVerificationEmail)
+	userGroup.POST("/forgot-password", userHandler.ForgotPassword)
+	userGroup.POST("/reset-password", userHandler.ResetPassword)
 
 	// Rute Terlindungi (membutuhkan Bearer Token JWT)
 	protected := r.Group("/v1/user")

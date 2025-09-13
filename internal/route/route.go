@@ -13,10 +13,12 @@ func SetupRoutes(
 	bookHandler *handler.BookHandler,
 	shortHandler *handler.ShortUrlHandler,
 	webSocketHandler *handler.WebSocketHandler,
+	matchHandler *handler.MatchHandler,
 ) {
 	AuthRoutes(r, authHandler)
 	UserRoutes(r, userHandler)
 	BookRoutes(r, bookHandler)
 	ShortRoutes(r, shortHandler)
 	WebSocketRoutes(r, webSocketHandler)
+	MatchRoutes(r, matchHandler)
 }

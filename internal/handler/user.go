@@ -3,7 +3,6 @@ package handler
 import (
 	"example/hello/internal/user"
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 
@@ -43,7 +42,6 @@ func (h *UserHandler) MyAccount(c *gin.Context) {
 	// ambil userID
 	userIDVal, exists := c.Get("userID")
 	if !exists {
-		log.Println("Error: userID tidak ditemukan di context Gin")
 		return
 	}
 

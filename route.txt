@@ -1,0 +1,74 @@
+func AuthRoutes(r *gin.Engine, authHandler *handler.AuthHandler) {
+	authGroup := r.Group("/v1/auth")
+
+	authGroup.GET("/google/login", authHandler.GoogleLogin)
+	authGroup.GET("/google/callback", authHandler.GoogleCallback)
+}
+
+
+func UserRoutes(r *gin.Engine, userHandler *handler.UserHandler) {
+	// Create a new group for user routes
+	userGroup := r.Group("/v1")
+
+	userGroup.POST("/register", userHandler.RegisterUser)
+	userGroup.POST("/login", userHandler.LoginUser)
+	userGroup.GET("/verify-email", userHandler.VerifyEmail)
+	userGroup.POST("/resend-verification", userHandler.ResendVerificationEmail)
+	userGroup.POST("/forgot-password", userHandler.ForgotPassword)
+	userGroup.POST("/reset-password", userHandler.ResetPassword)
+
+	// Rute Terlindungi (membutuhkan Bearer Token JWT)
+	protected := r.Group("/v1/user")
+	protected.Use(middleware.AuthMiddleware())
+
+	protected.GET("/", userHandler.GetUsers)
+	protected.GET("/me", userHandler.MyAccount)
+	protected.GET("/:id", userHandler.GetUserById)
+	protected.PUT("/:id", userHandler.UpdateUser)
+	protected.DELETE("/:id", userHandler.DeleteUser)
+}
+
+=============NOTE==========
+1. di ws ini bisa milih room
+2. ada 2 room yang bisa digunakan untuk publik (room, general)
+3. ada room lagi yang private (private-1-2) jadi gunakan id user pertama dan kedua, 
+    tapi harus sesuai urutan biar nanti riwayat chat masuk juga
+
+func WebSocketRoutes(r *gin.Engine, webSocketHandler *handler.WebSocketHandler) {
+	// Rute Terlindungi (membutuhkan Bearer Token JWT)
+	protected := r.Group("/v1")
+	protected.Use(middleware.AuthMiddleware())
+
+	protected.GET("/ws", webSocketHandler.ServeWs)
+}
+
+
+
+func BookRoutes(r *gin.Engine, bookHandler *handler.BookHandler) {
+	// Create a new group for book routes
+	bookGroup := r.Group("/v1")
+
+	// Define a simple GET endpoint
+	bookGroup.GET("/get-books", bookHandler.GetBooks)
+	bookGroup.GET("/get-book/:id", bookHandler.GetBookById)
+	bookGroup.PUT("/book/:id", bookHandler.UpdateBook)
+	bookGroup.DELETE("/book/:id", bookHandler.DeleteBook)
+	bookGroup.POST("/book", bookHandler.CreateBook)
+}
+
+
+func ShortRoutes(r *gin.Engine, shortHandler *handler.ShortUrlHandler) {
+
+	shortGroup := r.Group("/v1")
+
+	// Define a simple GET endpoint
+	shortGroup.GET("/:url", shortHandler.GetShortUrl)
+	shortGroup.POST("/shorten", shortHandler.CreateShortUrl)
+	shortGroup.PUT("/:id", shortHandler.UpdateShortUrl)
+	shortGroup.DELETE("/:id", shortHandler.DeleteShortUrl)
+	shortGroup.GET("/all", shortHandler.GetAllShortUrls)
+	shortGroup.GET("/find/:id", shortHandler.GetShortUrlByID)
+}
+
+
+

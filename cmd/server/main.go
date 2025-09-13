@@ -3,6 +3,7 @@ package main
 import (
 	"example/hello/internal/book"
 	"example/hello/internal/handler"
+	"example/hello/internal/match"
 	"example/hello/internal/realtime"
 	"example/hello/internal/route"
 	"example/hello/internal/short"
@@ -40,6 +41,7 @@ func main() {
 	db.AutoMigrate(&user.User{})
 	db.AutoMigrate(&short.Short{})
 	db.AutoMigrate(&realtime.Message{})
+	db.AutoMigrate(&match.Match{})
 
 	// === Dependency Injection Setup ===
 	// Inisialisasi semua dependency di satu tempat (Composition Root)
@@ -58,6 +60,11 @@ func main() {
 	shortRepository := short.NewRepository(db)
 	shortService := short.NewService(shortRepository)
 	shortHandler := handler.NewShortUrlHandler(shortService)
+
+	// Match Profile Dependencies
+	matchRepository := match.NewRepository(db)
+	matchService := match.NewService(matchRepository)
+	matchHandler := handler.NewMatchHandler(matchService)
 
 	// Konfigurasi Google OAuth2
 	googleOauthConfig := &oauth2.Config{
@@ -81,8 +88,11 @@ func main() {
 	// Create a new Gin router
 	r := gin.Default()
 
+	// Serve static files dari folder 'assets'
+	r.Static("/assets", "./assets")
+
 	// Setup routes dengan menyuntikkan handler yang sudah dibuat
-	route.SetupRoutes(r, authHandler, userHandler, bookHandler, shortHandler, webSocketHandler)
+	route.SetupRoutes(r, authHandler, userHandler, bookHandler, shortHandler, webSocketHandler, matchHandler)
 
 	// Start the server on port 8080
 	r.Run(":8080")

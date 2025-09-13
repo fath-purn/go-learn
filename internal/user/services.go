@@ -84,14 +84,11 @@ func (s *service) FindByID(ID int) (User, error) {
 
 	// 1. Coba ambil dari cache
 	if x, found := s.cache.Get(cacheKey); found {
-		log.Printf("Service: Cache HIT for user ID %d", ID)
 		// Ingat untuk membersihkan password hash jika Anda menyimpannya dalam cache
 		userFromCache := x.(User)
 		userFromCache.Password = ""
 		return userFromCache, nil
 	}
-
-	log.Printf("Service: Cache MISS for user ID %d, fetching from repository", ID)
 
 	user, err := s.repository.FindByID(ID)
 	if err != nil {
@@ -156,19 +153,16 @@ func (s *service) UserLogin(req UserLogin) (string, User, error) {
 
 	foundUser, err := s.repository.LoginUser(user)
 	if err != nil {
-		log.Println("Error finding user:", err)
 		return "", User{}, fmt.Errorf("invalid email or password")
 	}
 
 	// Verify password
 	if err := bcrypt.CompareHashAndPassword([]byte(foundUser.Password), []byte(user.Password)); err != nil {
-		log.Println("Error verifying password:", err)
 		return "", User{}, fmt.Errorf("invalid email or password")
 	}
 
 	token, err := auth.GenerateToken(fmt.Sprintf("%d", foundUser.ID), foundUser.Verivied)
 	if err != nil {
-		log.Println("Service: Error generating token:", err)
 		return "", User{}, fmt.Errorf("failed to generate authentication token")
 	}
 
@@ -178,11 +172,8 @@ func (s *service) UserLogin(req UserLogin) (string, User, error) {
 
 func (s *service) FindAll() ([]User, error) {
 	if x, found := s.cache.Get(allUsersCacheKey); found {
-		log.Println("Service: Cache HIT for all users")
 		return x.([]User), nil // Type assert ke []User
 	}
-
-	log.Println("Service: Cache MISS for all users, fetching from repository")
 
 	// Fetch all users from the repository
 	users, err := s.repository.FindAll()
@@ -307,20 +298,15 @@ func (s *service) ResendVerificationEmail(email string) error {
 func (s *service) ForgotPassword(email string) error {
 	user, err := s.repository.FindByEmail(email)
 	if err != nil {
-		// Untuk mencegah serangan enumerasi pengguna, kita bisa memilih untuk tidak mengembalikan error
-		// dan hanya mencatat log. Namun, untuk kejelasan, kita kembalikan error.
 		return fmt.Errorf("pengguna dengan email tersebut tidak ditemukan")
 	}
 
 	// Hasilkan token baru yang berisi email pengguna.
-	// Token ini berumur pendek dan khusus untuk reset password.
 	token, err := auth.GenerateTokenPassword(user.Email)
 	if err != nil {
-		log.Printf("Error saat membuat token reset password untuk %s: %v", email, err)
 		return fmt.Errorf("gagal memulai proses reset password")
 	}
 
-	// Kita tidak perlu menyimpan token ke DB. Token ini bersifat stateless.
 	go sendForgotPasswordEmail(user.Email, token)
 	return nil
 }
@@ -339,7 +325,6 @@ func (s *service) ResetPassword(token string, newPassword string) error {
 	const bcryptCost = 10
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcryptCost)
 	if err != nil {
-		log.Printf("Error saat hashing password baru untuk pengguna %s: %v", user.Email, err)
 		return fmt.Errorf("gagal memproses password baru")
 	}
 

@@ -1,3 +1,4 @@
+
 # Judul Proyek Anda (e.g., Djawa API Service)
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/fath-purn/go-learn)](https://goreportcard.com/report/github.com/fath-purn/go-learn)
@@ -67,7 +68,7 @@ Proyek ini adalah sebuah backend service yang menyediakan API untuk operasi CRUD
 
 Untuk menjalankan server pengembangan, gunakan perintah berikut dari root direktori proyek:
 ```bash
-go run main.go
+go run cmd/server/main.go
 ```
 
 ## Fitur
